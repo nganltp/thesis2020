@@ -164,6 +164,7 @@ class IMDB(object):
         for i in range(self.num_images):
             roi_rec = roidb[i]
             entry = {'image': roi_rec['image'],
+                     'stream': roi_rec['stream'],
                      'height': roi_rec['height'],
                      'width': roi_rec['width'],
                      #'boxes': boxes,
@@ -182,6 +183,22 @@ class IMDB(object):
               boxes[:, 2] = roi_rec['width'] - oldx1 - 1
               assert (boxes[:, 2] >= boxes[:, 0]).all()
               entry[k] = boxes
+            if 'landmarks' in roi_rec:
+              k = 'landmarks'
+              landmarks = roi_rec[k].copy()
+              landmarks[:,:,0] *= -1
+              landmarks[:,:,0] += (roi_rec['width']-1)
+              #for a in range(0,10,2):
+              #  oldx1 = landmarks[:, a].copy()
+              #  landmarks[:,a] = roi_rec['width'] - oldx1 - 1
+              order = [1,0,2,4,3]
+              flandmarks = landmarks.copy()
+              for idx, a in enumerate(order):
+                flandmarks[:, idx,:] = landmarks[:,a,:]
+
+              entry[k] = flandmarks
+            if 'blur' in roi_rec:
+              entry['blur'] = roi_rec['blur']
             roidb.append(entry)
 
         self.image_set_index *= 2

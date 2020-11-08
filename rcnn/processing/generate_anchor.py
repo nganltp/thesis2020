@@ -6,14 +6,14 @@ import sys
 from builtins import range
 import numpy as np
 from ..cython.anchors import anchors_cython
-from ..config import config
+#from ..config import config
 
 
 def anchors_plane(feat_h, feat_w, stride, base_anchor):
     return anchors_cython(feat_h, feat_w, stride, base_anchor)
 
 def generate_anchors(base_size=16, ratios=[0.5, 1, 2],
-                     scales=2 ** np.arange(3, 6)):
+                     scales=2 ** np.arange(3, 6), stride=16, dense_anchor=False):
     """
     Generate anchor (reference) windows by enumerating aspect ratios X
     scales wrt a reference (0, 0, 15, 15) window.
@@ -23,6 +23,12 @@ def generate_anchors(base_size=16, ratios=[0.5, 1, 2],
     ratio_anchors = _ratio_enum(base_anchor, ratios)
     anchors = np.vstack([_scale_enum(ratio_anchors[i, :], scales)
                          for i in range(ratio_anchors.shape[0])])
+    if dense_anchor:
+      assert stride%2==0
+      anchors2 = anchors.copy()
+      anchors2[:,:] += int(stride/2)
+      anchors = np.vstack( (anchors, anchors2) )
+    #print('GA',base_anchor.shape, ratio_anchors.shape, anchors.shape)
     return anchors
 
 #def generate_anchors_fpn(base_size=[64,32,16,8,4], ratios=[0.5, 1, 2], scales=8):
@@ -42,27 +48,31 @@ def generate_anchors(base_size=16, ratios=[0.5, 1, 2],
 #      anchors.append(r)
 #    return anchors
 
-def generate_anchors_fpn():
+def generate_anchors_fpn(dense_anchor=False, cfg = None):
     #assert(False)
     """
     Generate anchor (reference) windows by enumerating aspect ratios X
     scales wrt a reference (0, 0, 15, 15) window.
     """
+    if cfg is None:
+      from ..config import config
+      cfg = config.RPN_ANCHOR_CFG
+    RPN_FEAT_STRIDE = []
+    for k in cfg:
+      RPN_FEAT_STRIDE.append( int(k) )
+    RPN_FEAT_STRIDE = sorted(RPN_FEAT_STRIDE, reverse=True)
     anchors = []
-    for k, v in config.RPN_ANCHOR_CFG.items():
-    #for k, v in config.RPN_ANCHOR_CFG.iteritems():
+    for k in RPN_FEAT_STRIDE:
+      v = cfg[str(k)]
       bs = v['BASE_SIZE']
       __ratios = np.array(v['RATIOS'])
       __scales = np.array(v['SCALES'])
+      stride = int(k)
       #print('anchors_fpn', bs, __ratios, __scales, file=sys.stderr)
-      r = generate_anchors(bs, __ratios, __scales)
+      r = generate_anchors(bs, __ratios, __scales, stride, dense_anchor)
       #print('anchors_fpn', r.shape, file=sys.stderr)
       anchors.append(r)
-      #print (r)
-    anchors=[np.array([[-248., -248.,  263.,  263.],
-       [-120., -120.,  135.,  135.]]), np.array([[-56., -56.,  71.,  71.],
-       [-24., -24.,  39.,  39.]]), np.array([[-8., -8., 23., 23.],
-       [ 0.,  0., 15., 15.]])]
+
     return anchors
 
 def _whctrs(anchor):

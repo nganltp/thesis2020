@@ -1,5 +1,6 @@
 import numpy as np
 from ..cython.bbox import bbox_overlaps_cython
+#from rcnn.config import config
 
 
 def bbox_overlaps(boxes, query_boxes):
@@ -71,8 +72,46 @@ def nonlinear_transform(ex_rois, gt_rois):
     targets_dw = np.log(gt_widths / ex_widths)
     targets_dh = np.log(gt_heights / ex_heights)
 
-    targets = np.vstack(
-        (targets_dx, targets_dy, targets_dw, targets_dh)).transpose()
+    if gt_rois.shape[1]<=4:
+      targets = np.vstack(
+          (targets_dx, targets_dy, targets_dw, targets_dh)).transpose()
+      return targets
+    else:
+      targets = [targets_dx, targets_dy, targets_dw, targets_dh]
+      #if config.USE_BLUR:
+      #  for i in range(4, gt_rois.shape[1]):
+      #    t = gt_rois[:,i]
+      #    targets.append(t)
+      targets = np.vstack(targets).transpose()
+      return targets
+
+def landmark_transform(ex_rois, gt_rois):
+
+    assert ex_rois.shape[0] == gt_rois.shape[0], 'inconsistent rois number'
+
+    ex_widths = ex_rois[:, 2] - ex_rois[:, 0] + 1.0
+    ex_heights = ex_rois[:, 3] - ex_rois[:, 1] + 1.0
+    ex_ctr_x = ex_rois[:, 0] + 0.5 * (ex_widths - 1.0)
+    ex_ctr_y = ex_rois[:, 1] + 0.5 * (ex_heights - 1.0)
+
+    
+    targets = []
+    for i in range(gt_rois.shape[1]):
+      for j in range(gt_rois.shape[2]):
+        #if not config.USE_OCCLUSION and j==2:
+        #  continue
+        if j==2:
+          continue
+        if j==0: #w
+          target = (gt_rois[:,i,j] - ex_ctr_x) / (ex_widths + 1e-14)
+        elif j==1: #h
+          target = (gt_rois[:,i,j] - ex_ctr_y) / (ex_heights + 1e-14)
+        else: #visibile
+          target = gt_rois[:,i,j]
+        targets.append(target)
+
+
+    targets = np.vstack(targets).transpose()
     return targets
 
 
@@ -115,6 +154,23 @@ def nonlinear_pred(boxes, box_deltas):
 
     return pred_boxes
 
+def landmark_pred(boxes, landmark_deltas):
+    if boxes.shape[0] == 0:
+        return np.zeros((0, landmark_deltas.shape[1]))
+    boxes = boxes.astype(np.float, copy=False)
+    widths = boxes[:, 2] - boxes[:, 0] + 1.0
+    heights = boxes[:, 3] - boxes[:, 1] + 1.0
+    ctr_x = boxes[:, 0] + 0.5 * (widths - 1.0)
+    ctr_y = boxes[:, 1] + 0.5 * (heights - 1.0)
+    preds = []
+    for i in range(landmark_deltas.shape[1]):
+      if i%2==0:
+        pred = (landmark_deltas[:,i]*widths + ctr_x)
+      else:
+        pred = (landmark_deltas[:,i]*heights + ctr_y)
+      preds.append(pred)
+    preds = np.vstack(preds).transpose()
+    return preds
 
 def iou_transform(ex_rois, gt_rois):
     """ return bbox targets, IoU loss uses gt_rois as gt """

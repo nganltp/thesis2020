@@ -4,46 +4,58 @@ import numpy as np
 from Arcface import ArcfaceModel
 from face_preprocess import preprocess
 import cv2
-from Sshdetector import SSHDetector
-from OnetLnet import OnetLnetAlignment
+from retinaface import RetinaFace
 
 
 class FacialRecognition():
-    def __init__(self, gpu_index=-1, mtcnn_model="mtcnn-model", arcface_model="model-r100-ii/model,0",
-                 image_size='112,112', ssh_detector="ssh-model-final/sshb", mtcnn_num_worker=1):
+    def __init__(self, gpu_index=-1, arcface_model="model-r100-ii/model,0",
+                 image_size='112,112', retina_model="/model/R50"):
         if gpu_index >= 0:
-            mtcnn_ctx = mx.gpu(gpu_index)
+            retina_ctx = mx.gpu(gpu_index)
         else:
-            mtcnn_ctx = mx.cpu()
-        self.face_detector = SSHDetector(prefix=ssh_detector, epoch=0, ctx_id=gpu_index, test_mode=True)
+            retina_ctx = mx.cpu()
+        self.face_detector = RetinaFace(prefix=retina_model, epoch=0, ctx_id=gpu_index)
         self.face_recognition = ArcfaceModel(gpu=gpu_index, model=arcface_model, image_size=image_size)
-        self.landmark_detector = OnetLnetAlignment(model_folder=mtcnn_model, ctx=mtcnn_ctx, num_worker=mtcnn_num_worker,
-                                                   accurate_landmark=True, threshold=[0.6, 0.7, 0.5])
 
     def get_scales(self, img):
-        TEST_SCALES = [100, 200, 300, 400]
-        target_size = 400
-        max_size = 1200
+        scales = [1024, 1980]
         im_shape = img.shape
+        target_size = scales[0]
+        max_size = scales[1]
         im_size_min = np.min(im_shape[0:2])
         im_size_max = np.max(im_shape[0:2])
+        #im_scale = 1.0
+        #if im_size_min>target_size or im_size_max>max_size:
         im_scale = float(target_size) / float(im_size_min)
         # prevent bigger axis from being more than max_size:
         if np.round(im_scale * im_size_max) > max_size:
             im_scale = float(max_size) / float(im_size_max)
-        scales = [float(scale) / target_size * im_scale for scale in TEST_SCALES]
+        scales = [im_scale]
+        # print('im_scale', im_scale)
+        # im_shape = img.shape
+        # TEST_SCALES = [100, 200, 300, 400]
+        # target_size = 400
+        # max_size = 1200
+        # im_size_min = np.min(im_shape[0:2])
+        # im_size_max = np.max(im_shape[0:2])
+        # im_scale = float(target_size) / float(im_size_min)
+        # # prevent bigger axis from being more than max_size:
+        # if np.round(im_scale * im_size_max) > max_size:
+        #     im_scale = float(max_size) / float(im_size_max)
+        # scales = [float(scale) / target_size * im_scale for scale in TEST_SCALES]
         return scales
 
     def detect_face_and_get_embedding(self, img):
-        thresh = 0.2
+        thresh = 0.8
+        flip = False
         scales = self.get_scales(img)
-        bboxes = self.face_detector.detect(img, threshold=thresh, scales=scales)
-#         print('bbox:', bboxes)
+        bboxes, rs = self.face_detector.detect(img, thresh, scales=scales, do_flip=flip)
+        # print('bbox:', bboxes)
         if len(bboxes) <= 0:
             return None, None
-        rs = self.landmark_detector.detect_landmark(img, bboxes)
+        # print('landmark:', rs)
         if rs is not None:
-            _, points = rs
+            points = rs.astype(np.int32)
             point = points[0, :].reshape((2, 5)).T
             nimg = preprocess(img, bboxes[0], point, image_size='112,112')
 #             nimg = cv2.cvtColor(nimg, cv2.COLOR_BGR2RGB)      
@@ -53,13 +65,13 @@ class FacialRecognition():
         return None, None
     
     def detect_face_and_get_embedding_test(self, img):
-        thresh = 0.2
+        thresh = 0.8
+        flip = False
         scales = self.get_scales(img)
-        bboxes = self.face_detector.detect(img, threshold=thresh, scales=scales)
+        bboxes, rs = self.face_detector.detect(img, thresh, scales=scales, do_flip=flip)
         if len(bboxes) <= 0:
             return None
         print('len bboxes: ',len(bboxes))
-        rs = self.landmark_detector.detect_landmark(img, bboxes)
         embeddings = []
         if rs is not None:
             bboxes , points = rs
@@ -77,16 +89,16 @@ class FacialRecognition():
             return embeddings
         return None
     def detect_face_and_get_embedding_test_2(self, img):
-        thresh = 0.2
+        thresh = 0.8
+        flip = False
         scales = self.get_scales(img)
-        bboxes = self.face_detector.detect(img, threshold=thresh, scales=scales)
+        bboxes, rs = self.face_detector.detect(img, thresh, scales=scales, do_flip=flip)
         if len(bboxes) <= 0:
             return None, None
-        rs = self.landmark_detector.detect_landmark(img, bboxes)
         embeddings = []
         bbox_list = []
         if rs is not None:
-            bboxes, points = rs
+            points = rs.astype(np.int32)
             for i, bbox in enumerate(bboxes):
                 point = points[i, :].reshape((2, 5)).T
                 nimg = preprocess(img, bbox, point, image_size='112,112')
