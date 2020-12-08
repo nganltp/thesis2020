@@ -2,7 +2,6 @@ import cv2
 import numpy as np
 from skimage import transform as trans
 
-
 def parse_lst_line(line):
     vec = line.strip().split("\t")
     assert len(vec) >= 3
