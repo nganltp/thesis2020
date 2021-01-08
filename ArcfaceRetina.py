@@ -100,8 +100,8 @@ class FacialRecognition():
         if rs is not None:
             points = rs.astype(np.int32)
             for i, bbox in enumerate(bboxes):
-                point = points[i, :].reshape((2, 5)).T
-                nimg = preprocess(img, bbox, point, image_size='112,112')
+               # point = points[i, :].reshape((2, 5)).T
+                nimg = preprocess(img, bbox, points[i], image_size='112,112')
                 nimg = cv2.cvtColor(nimg, cv2.COLOR_BGR2RGB)
                 x = np.transpose(nimg, (2, 0, 1))
                 embedding = self.face_recognition.get_feature(x)

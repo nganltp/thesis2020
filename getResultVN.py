@@ -10,12 +10,11 @@ from matplotlib import pyplot as plt
 from skimage import io
 from multiprocessing.dummy import Pool as ThreadPool
 
-img_txt = open("Img_v2.txt","w+") 
-person_txt = open("Result_v2.txt","w+") 
+
+person_txt = open("Result_celeb.txt","w+") 
 
 def handle_recognize_face(bounded_face, k):
     D, I = search_model.search(bounded_face, k)
-
     predictions = []
     for k in range(len(I[0])):
         la = Y_train[I[0][k]]
@@ -33,7 +32,6 @@ def predict_2(img):
     list_label = []
     if not features:
         return None
-
     param_pools = []
     for feature in features:
         bounded_face = np.array([feature])
@@ -112,19 +110,16 @@ search_model.add(X_train)
 # TEST
 count = 1
 import time
-path_data = u"Process/Test"
+path_data = u"./VN-celeb"
 list_people = os.listdir(path_data)
-accs = []
-nones = []
+list_name = []
 start = time.time()
 for person in list_people:
     print(person)
     path_person = os.path.join(path_data, person)
     list_name_person = os.listdir(path_person)
-    T_img = 0
-    F_img = 0
-    acc = 0
-    none = 0
+    celeb_dict = {}
+
     for name_img in list_name_person:
         path_img = os.path.join(path_person, name_img)
         print(path_img, count)
@@ -133,39 +128,29 @@ for person in list_people:
         
         labels = predict_2(img)
         if labels is None:
-            none += 1
-            img_txt.write(str(path_img) + " none" + "\n")
+            continue
         if labels is not None:
-            for la in labels:
-                img_txt.write(str(path_img) + ": "+ str(la) + "\n")
-                #person = person.encode("ascii", "ignore").decode()
-                # person = unidecode(person)
-                #print(type(person) ,str(person), len(str(person)))
-                # la = unidecode(la)
-                #print(type(la), str(la), len(str(la)))
-                #for i, c in enumerate(person):
-                #    print(i,c)
-                #for i, c in enumerate(la):
-                #    print(i,c)
-               # print('person: ' + person, 'predict: ' + la)
-                if la == person:
-                    T_img += 1
-                    print('True') 
-                else:
-                    F_img += 1
-                    print('False') 
-    total = T_img + F_img
-    if (total == 0):
-        acc = 0
+            for i, label in enumerate(labels):
+                list_name.append(label)
+    # print("List name: " + str(list_name))
+    if len(list_name) < 1:
+        person_txt.write(str(path_person) + str(list_name) + "\n")
     else:
-        acc = T_img/(T_img + F_img)
-    print('Result: ',person," Acc: ",acc, " none: ", none, ' True img: ', T_img, ' False img: ', F_img)
-    person_txt.write("Result: " + str(person) + " Acc: " + str(acc) + " none: " + str(none) + ' True img: ' + str(T_img) + ' False img: ' + str(F_img) + "\n")
-#     accs.append(acc)
-#     nones.append(none)
-print(time.time() - start)
+        for i, name in enumerate(list_name):
+            if name == "unknown":
+                continue
+            if name not in celeb_dict.keys():
+                celeb_dict.update({name: 0})
+            celeb_dict[name]+=1
+        if len(celeb_dict.values()) <= 0:
+            person_txt.write(str(path_person) + " unknown" + "\n")
+        else:
+            # print(celeb_dict)
+            # person_txt.write(str(path_person)  + str(celeb_dict) + "\n")
+            max_celeb = max(list(celeb_dict.values()))
+            names: list = list(filter(lambda x: celeb_dict[x] == max_celeb, list(celeb_dict.keys())))
+            person_txt.write(str(path_person) + str(names) + "\n")
 
-img_txt.close()
+print(time.time() - start)
 person_txt.close()
-# print(accs)
-# print(nones)
+

@@ -1,7 +1,7 @@
 import os
 import glob
 import pickle
-from  ArcfaceSshOLnet import FacialRecognition
+from  ArcfaceRetina import FacialRecognition
 import cv2
 import argparse
 import pickle
@@ -19,11 +19,11 @@ model = FacialRecognition(arcface_model=arcface_model,
 flip = False
 
 dicts = []
-path_data = './Data_Celeb/train'
+path_data = './Process/Filter'
 list_people = os.listdir(path_data)
-wr = open("Celeb-model-1","wb")
+wr = open("Model-v1","wb")
 
-path_else = './Data_Celeb/else'
+path_else = './Process/Else'
 count = 0
 for person in list_people:
 #     os.mkdir('detect-face-100/' + str(person))
@@ -42,20 +42,21 @@ for person in list_people:
             print(path_img, count)
             embedding, nimg = model.detect_face_and_get_embedding(img)
             count += 1
-            # print(embedding, nimg)
+           # print(embedding)
             if embedding is None:
                 error += 1
             if embedding is not None:
-                #print(len(embedding.shape))
-                if len(embedding) == 1:
+                # print(len(embedding) ,len(embedding.shape))
+                if len(embedding.shape) == 1:
                   dict['class'] = person
                   dict['features'] = embedding
                   dict['imgfile'] = name_img
+                 # print(dict)
                   dicts.append(dict)
                 if len(embedding.shape) != 1:
                     if not os.path.exists(folder_else):
                       os.makedirs(folder_else)
-                    else:    
+                    else: 
                       print("Directory already exists")
                     print(os.path.join(path_else, person, name_img))
                     copyfile(path_img, os.path.join(path_else, person, name_img))
